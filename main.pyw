@@ -1,58 +1,93 @@
+import argparse
+from enum import Enum
+from functools import partial
+import json
 import logging
 
 import keyboard
 import pyperclip
 
-HOTKEY =   "Alt + Ctrl + T"
 
-T = {
-    'й': 'q', 'ц': 'w', 'у': 'e', 'к': 'r', 'е': 't', 'н': 'y', 'г': 'u', 'ш': 'i', 'щ': 'o', 'з': 'p', 'х': '[', 'ъ': ']',
-    'ф': 'a', 'ы': 's', 'в': 'd', 'а': 'f', 'п': 'g', 'р': 'h', 'о': 'j', 'л': 'k', 'д': 'l', 'ж': ';', 'э': "'",
-    'я': 'z', 'ч': 'x', 'с': 'c', 'м': 'v', 'и': 'b', 'т': 'n', 'ь': 'm', 'б': ',', 'ю': '.',
+class Modes(str, Enum):
+    copy = "copy"
+    paste = "paste"
+    copy_paste = "copy-paste"
 
-    'Й': 'Q', 'Ц': 'W', 'У': 'E', 'К': 'R', 'Е': 'T', 'Н': 'Y', 'Г': 'U', 'Ш': 'I', 'Щ': 'O', 'З': 'P', 'Х': '{', 'Ъ': '}',
-    'Ф': 'A', 'Ы': 'S', 'В': 'D', 'А': 'F', 'П': 'G', 'Р': 'H', 'О': 'J', 'Л': 'K', 'Д': 'L', 'Ж': ':', 'Э': '"',
-    'Я': 'Z', 'Ч': 'X', 'С': 'C', 'М': 'V', 'И': 'B', 'Т': 'N', 'Ь': 'M', 'Б': '<', 'Ю': '>',
+MODES = [e.value for e in Modes]
 
-    'q': 'й', 'w': 'ц', 'e': 'у', 'r': 'к', 't': 'е', 'y': 'н', 'u': 'г', 'i': 'ш', 'o': 'щ', 'p': 'з', '[': 'х', ']': 'ъ',
-    'a': 'ф', 's': 'ы', 'd': 'в', 'f': 'а', 'g': 'п', 'h': 'р', 'j': 'о', 'k': 'л', 'l': 'д', ';': 'ж', "'": 'э',
-    'z': 'я', 'x': 'ч', 'c': 'с', 'v': 'м', 'b': 'и', 'n': 'т', 'm': 'ь', ',': 'б', '.': 'ю',
 
-    'Q': 'Й', 'W': 'Ц', 'E': 'У', 'R': 'К', 'T': 'Е', 'Y': 'Н', 'U': 'Г', 'I': 'Ш', 'O': 'Щ', 'P': 'З', '{': 'Х', '}': 'Ъ',
-    'A': 'Ф', 'S': 'Ы', 'D': 'В', 'F': 'А', 'G': 'П', 'H': 'Р', 'J': 'О', 'K': 'Л', 'L': 'Д', ':': 'Ж', '"': 'Э',
-    'Z': 'Я', 'X': 'Ч', 'C': 'С', 'V': 'М', 'B': 'И', 'N': 'Т', 'M': 'Ь', '<': 'Б', '>': 'Ю'
-}
-
-def setup_logger(log_file_path: str):
+def setup_logger(log_file: str) -> logging.Logger:
     logger = logging.getLogger(__name__)
-    logger.setLevel(logging.INFO)
+    logger.setLevel(logging.DEBUG)
 
-    file_handler = logging.FileHandler(log_file_path, encoding='utf-8')
+    file_handler = logging.FileHandler(log_file, encoding="utf-8")
     file_handler.setLevel(logging.DEBUG)
 
-    formatter = logging.Formatter('[%(asctime)s] - %(message)s')
+    formatter = logging.Formatter("[%(asctime)s] - %(message)s")
     file_handler.setFormatter(formatter)
 
     logger.addHandler(file_handler)
 
-def translate(text: str) -> str:
-    return ''.join([T.get(s, s) for s in text])
+    with open(log_file, 'w'):
+        pass
 
-def paste_translated():
+    return logger
+
+
+def load_translate(path: str):
+    return json.load(open(path, encoding='utf-8'))
+
+
+def translate(text: str, keys_translate: dict[str, str]) -> str:
+    return ''.join([keys_translate.get(s, s) for s in text])
+
+
+def paste_translated(keys_translate: dict[str, str], mode: Modes):
+    """
+    Copy translated text to clipboard and paste it.
+    """
+
     logger = logging.getLogger(__name__)
 
     text = pyperclip.paste()
 
-    new_text = translate(text)
+    new_text = translate(text, keys_translate)
 
-    keyboard.write(new_text)
+    match mode:
+        case Modes.copy:
+            pyperclip.copy(new_text)
 
-    logger.info(str(text), "->", str(new_text))
+        case Modes.paste:
+            keyboard.write(new_text)
+
+        case Modes.copy_paste:
+            pyperclip.copy(new_text)
+            keyboard.send("Ctrl+V")
+
+    logger.info("'" + str(text) + "'" + " -> " + "'" + str(new_text) + "'")
 
 def main():
-    setup_logger("log.log")
+    parser = argparse.ArgumentParser(add_help=False)
 
-    keyboard.add_hotkey(HOTKEY, paste_translated)
+    parser.add_argument("-h", "--hotkey",  type=str, default = "Ctrl + Y")
+    parser.add_argument("-l", "--log-file", type=str, default = "log.log")
+    parser.add_argument("-m", "--mode", type=str, default = "copy-paste", choices=MODES)
+    parser.add_argument("-t", "--translate-file", type=str, default = "./translate/en-ru.json")
+
+    args = parser.parse_args()
+
+    log_file = args.log_file
+    hotkey = args.hotkey
+    translate_file = args.translate_file
+    mode = args.mode
+
+    logger = setup_logger(log_file)
+
+    logger.debug(f"Settings: {log_file=} {hotkey=} {mode=} {translate_file=}")
+
+    keys_translate = load_translate(translate_file)
+
+    keyboard.add_hotkey(hotkey, partial(paste_translated, keys_translate, mode))
 
     keyboard.wait()
 
