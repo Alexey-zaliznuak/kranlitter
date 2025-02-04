@@ -69,7 +69,7 @@ def paste_translated(keys_translate: dict[str, str], mode: Modes):
 def main():
     parser = argparse.ArgumentParser(add_help=False)
 
-    parser.add_argument("-h", "--hotkey",  type=str, default = "Ctrl + Y")
+    parser.add_argument("-h", "--hotkey",  type=str, default = "Ctrl + Alt")
     parser.add_argument("-l", "--log-file", type=str, default = "log.log")
     parser.add_argument("-m", "--mode", type=str, default = "copy-paste", choices=MODES)
     parser.add_argument("-t", "--translate-file", type=str, default = "./translate/en-ru.json")
